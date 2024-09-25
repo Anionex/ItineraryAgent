@@ -29,7 +29,7 @@ STOP_WORD = "/>"
 class ReactAgent:
     def __init__(self, **kwargs) -> None: 
         self.tools = Tools()
-        kwargs['model'] = kwargs.get('model', 'gpt-4o-mini')
+        kwargs['model'] = kwargs.get('model', 'gpt-4o')
         kwargs['stop'] = kwargs.get('stop', ['\n'])
         kwargs['temperature'] = kwargs.get('temperature', 0)
         self.kwargs = kwargs
@@ -108,7 +108,7 @@ class ReactAgent:
             elif response.startswith(ACTION_OUTPUT_HEADER):
                 response = "Please remember that you shouldn't generate Tool Output by yourself"
             else:
-                response = f"Please remember that only the following outputs are allowed: [{THOUGHT_HEADER}, {ACTION_HEADER}, {ACTION_INPUT_HEADER}, {ACTION_OUTPUT_HEADER}, {ANSWER_HEADER}]"
+                response = f"Please remember that only the following tags are allowed: [{THOUGHT_HEADER + STOP_WORD}, {ACTION_HEADER + STOP_WORD}, {ACTION_INPUT_HEADER + STOP_WORD}, {ACTION_OUTPUT_HEADER + STOP_WORD}, {ANSWER_HEADER + STOP_WORD}]"
             response += STOP_WORD
             print("[1]" + response)
             self.scratchpad += '\n' + response

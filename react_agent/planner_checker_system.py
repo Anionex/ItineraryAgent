@@ -1,3 +1,4 @@
+from datetime import datetime
 import sys
 import os
 
@@ -8,10 +9,6 @@ from prompts import REACT_PLANNER_PROMPT_TWO_STAGE_IN_ONE
 ADVICE_HEADER = "<Advice:"
 
 def planner_checker_loop(query, extra_requirements=''):
-    planner = planner_two_stage_in_one
-    checker = PlanChecker()
-    
-    
     while True:
         # 使用 planner 获取旅游路线规划
         plan = planner.run(query, extra_requirements=extra_requirements, system_prompt=REACT_PLANNER_PROMPT_TWO_STAGE_IN_ONE)
@@ -47,7 +44,19 @@ def read_file(file_path):
         return file.read()
 
 if __name__ == '__main__':
+    planner = planner_two_stage_in_one
+    checker = PlanChecker()
+    
     query = read_file("example_query.txt")
     final_plan = planner_checker_loop(query)
     print("=====\nFinal Itinerary:\n=====")
     print(final_plan)
+    
+    ## 创建log文件夹
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
+    
+    ## 打印scratchpad到文件
+    with open("logs/scratchpad" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + ".txt", "w", encoding="utf-8") as file:
+        file.write(planner.scratchpad)
+
