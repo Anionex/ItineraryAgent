@@ -1,10 +1,11 @@
 # this project
-
+papers/
 database/
 tmp/
 trip2.html
 Untitled-1.*
-
+tmp*
+tmp*/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

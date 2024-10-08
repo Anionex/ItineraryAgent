@@ -2,9 +2,10 @@ from datetime import datetime
 import sys
 import os
 
-from planner_two_stage_in_one import planner_two_stage_in_one
-from plan_checker import PlanChecker
-from prompts import REACT_PLANNER_PROMPT_TWO_STAGE_IN_ONE
+
+from agents.planner_two_stage_in_one import planner_two_stage_in_one
+from agents.plan_checker import PlanChecker
+from agents.prompts import REACT_PLANNER_PROMPT_TWO_STAGE_IN_ONE
 
 ADVICE_HEADER = "<Advice:"
 

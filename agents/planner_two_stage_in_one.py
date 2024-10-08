@@ -5,7 +5,7 @@ print(os.path.join(os.getcwd(), "tools"))
 sys.path.append(os.path.abspath(os.getcwd()))
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "tools")))
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-from react_agent import ReactAgent
+from agents.react_agent import ReactAgent
 from prompts import REACT_PLANNER_PROMPT_TWO_STAGE_IN_ONE
 from tool_funcs import get_attractions, get_restaurants, get_accommodations, get_flights, get_google_distance_matrix, calculator, google_search
 
@@ -68,7 +68,6 @@ planner_two_stage_in_one.tools.add_tool(
         }
     ]
 )
-
 planner_two_stage_in_one.tools.add_tool(
     name_for_human="Get Accommodation Information",
     name_for_model="get_accommodations",
@@ -83,7 +82,6 @@ planner_two_stage_in_one.tools.add_tool(
         }
     ]
 )
-
 planner_two_stage_in_one.tools.add_tool(
     name_for_human="Get Flight Information",
     name_for_model="get_flights",
@@ -110,7 +108,6 @@ planner_two_stage_in_one.tools.add_tool(
         }
     ]
 )
-
 planner_two_stage_in_one.tools.add_tool(
     name_for_human="Get Distance and Time Information",
     name_for_model="get_google_distance_matrix",
@@ -136,8 +133,7 @@ planner_two_stage_in_one.tools.add_tool(
             'schema': {'type': 'string'},
         }
     ]
-)
-    
+) 
 # planner_two_stage_in_one.tools.add_tool(
 #     name_for_human="Check Plan",
 #     name_for_model="check_plan",

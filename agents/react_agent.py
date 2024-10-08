@@ -7,13 +7,11 @@ sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "tools")))
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Union
 import json5
 from chat_model import OpenAIChat
-from tool_registry import ToolRegistry, Tools
-from prompts import REACT_PROMPT, TOOL_DESC, REACT_PLANNER_PROMPT_TWO_STAGE_IN_ONE
+from tool_registry import Tools
+from prompts import REACT_PROMPT, TOOL_DESC
 import os, sys
-from tool_funcs import get_attractions, get_restaurants, get_accommodations, get_flights, get_google_distance_matrix
 
 
 from tool_funcs import calculator, google_search
