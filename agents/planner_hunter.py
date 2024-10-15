@@ -80,17 +80,49 @@ if __name__ == '__main__':
         ]
     )
 
+    # agent.tools.add_tool(
+    #     name_for_human="获取住宿信息",
+    #     name_for_model="get_accommodations",
+    #     func=get_accommodations,
+    #     description="获取指定城市的住宿选项。",
+    #     parameters=[
+    #         {
+    #             'name': 'city',
+    #             'description': '城市名称',
+    #             'required': True,
+    #             'schema': {'type': 'string'},
+    #         }
+    #     ]
+    # )
     agent.tools.add_tool(
         name_for_human="获取住宿信息",
         name_for_model="get_accommodations",
         func=get_accommodations,
-        description="获取指定城市的住宿选项。",
+        description="获取指定城市、入住日期、退房日期和人数的住宿选项。",
         parameters=[
             {
                 'name': 'city',
                 'description': '城市名称',
                 'required': True,
                 'schema': {'type': 'string'},
+            },
+            {
+                'name': 'check_in_date',
+                'description': '入住日期',
+                'required': True,
+                'schema': {'type': 'string'},
+            },
+            {
+                'name': 'check_out_date',
+                'description': '退房日期',
+                'required': True,
+                'schema': {'type': 'string'},
+            },
+            {
+                'name': 'adults',
+                'description': '成人数量',
+                'required': True,
+                'schema': {'type': 'integer'},
             }
         ]
     )

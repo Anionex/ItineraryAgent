@@ -1,4 +1,3 @@
-import asyncio
 import json
 import googlemaps
 from datetime import datetime
@@ -15,15 +14,22 @@ current_dir = os.path.dirname(__file__)
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 
 from config import *
-from utils import translate_city, get_restaurant_average_cost_async, get_entity_attribute_async
+from tools.utils import translate_city, get_restaurant_average_cost, get_entity_attribute
 
 gmaps = googlemaps.Client(key=os.getenv("GOOGLE_MAPS_API_KEY"))
-from amadeus import Client, ResponseError
 
+
+from amadeus import Client, ResponseError, Location
+
+amadeus = Client(
+    client_id=os.getenv("AMADEUS_API_KEY"),
+    client_secret=os.getenv("AMADEUS_API_SECRET"),
+    hostname='production'
+)
 def get_accommodations(city, check_in_date, check_out_date, adults, rooms=1, currency=GLOBAL_CURRENCY, language=GLOBAL_LANGUAGE, max_results=30):
 
     try:
-        # 先翻译
+        # Translate first
         city = translate_city(city)
         # get city code
         city_code = amadeus.reference_data.locations.get(
@@ -31,18 +37,19 @@ def get_accommodations(city, check_in_date, check_out_date, adults, rooms=1, cur
             subType=Location.ANY
         ).data[0]['iataCode']
         
-        # 搜索城市的酒店
+        # Search for hotels in the city
         hotel_list = amadeus.reference_data.locations.hotels.by_city.get(
-            cityCode=city_code  # 城市的IATA代码
+            cityCode=city_code  # City's IATA code
         )
 
-        # 获取前max_results个酒店的ID
+        # Get the IDs of the first max_results hotels
         hotel_ids = [hotel['hotelId'] for hotel in hotel_list.data[:max_results]]
         # print("hotel_ids:", hotel_ids)
         
-        # 搜索这些酒店的报价
+        # Search for offers for these hotels
         str_answer = ""
-        for index, hotel_id in enumerate(hotel_ids):
+        index = 0
+        for hotel_id in hotel_ids:
             try:
                 hotel_offer = amadeus.shopping.hotel_offers_search.get(
                     hotelIds=hotel_id,
@@ -53,14 +60,13 @@ def get_accommodations(city, check_in_date, check_out_date, adults, rooms=1, cur
                     currency=currency,
                     lang=language
                 )
-                # print(f"hotel_offer for {hotel_id}:", str(hotel_offer.data))
                 
                 if hotel_offer.data:
                     offer = hotel_offer.data[0]
                     hotel_name = offer['hotel']['name']
                     price = offer['offers'][0]['price']['total']
                     
-                    # 单独获取每个酒店的评分
+                    # Get rating for each hotel separately
                     try:
                         hotel_rating = amadeus.e_reputation.hotel_sentiments.get(
                             hotelIds=hotel_id
@@ -70,15 +76,18 @@ def get_accommodations(city, check_in_date, check_out_date, adults, rooms=1, cur
                     except ResponseError:
                         rating = "N/A"
                     if rating != "N/A":
-                        str_answer += f"{index+1}. {hotel_name}, 价格: {price} {currency}, 评分: {rating}\n"
+                        index += 1
+                        str_answer += f"{index}. {hotel_name}, price for {adults} adults: {price} {currency}, rating: {rating}\n"
             except ResponseError as error:
                 # print(f"获取酒店 {hotel_id} 的信息时发生错误: {error}")
                 pass
 
+        if str_answer == "":
+            return f"There are no accommodations found in {city} from {check_in_date} to {check_out_date}."
         return str_answer
 
     except ResponseError as error:
-        return f"发生错误: {error}"
+        return f"An error occurred: {error}"
 
 def get_attractions(city, language=GLOBAL_LANGUAGE, num=10):
     # Get the latitude and longitude of the city
@@ -107,13 +116,31 @@ def get_attractions(city, language=GLOBAL_LANGUAGE, num=10):
     # Sort
     attractions.sort(key=lambda x: x["Rating"], reverse=True)
     attractions = attractions[0:num] if len(attractions) > num else attractions
+    # Concurrently get ticket prices for attractions
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(num, 10)) as executor:
+        future_to_price = {
+            executor.submit(get_entity_attribute, attraction['Name'], 'ticket price', 'free'): attraction
+            for attraction in attractions[:num]
+        }
+        
+        for future in concurrent.futures.as_completed(future_to_price):
+            attraction = future_to_price[future]
+            try:
+                price, extra_info = future.result()
+                attraction['Ticket Price'] = price
+            except Exception as exc:
+                print(f'Error getting ticket price for {attraction["Name"]}: {exc}')
+    
     str_answer = ""
     for index, attraction in enumerate(attractions):
-        str_answer += f"{index+1}. {attraction['Name']}({attraction['Address']}), rating: {attraction['Rating']}\n"
+        str_answer += f"{index+1}. {attraction['Name']}, rating: {attraction['Rating']}, cost: {attraction.get('Ticket Price', 'free')}\n"
+    
+    if str_answer == "":
+        return f"There are no attractions found in {city}."
     return str_answer
 
 
-async def get_restaurants_async(city, language=GLOBAL_LANGUAGE, num=10):
+def get_restaurants(city, language=GLOBAL_LANGUAGE, num=10):
     # Get the latitude and longitude of the city
     geocode_result = gmaps.geocode(city)
     lat = geocode_result[0]['geometry']['location']['lat']
@@ -126,7 +153,6 @@ async def get_restaurants_async(city, language=GLOBAL_LANGUAGE, num=10):
                            )
 
     # Extract results
-    
     restaurants = []
     for place in results.get('results', []):
         # use place_id to get more information
@@ -149,68 +175,64 @@ async def get_restaurants_async(city, language=GLOBAL_LANGUAGE, num=10):
             restaurants.append(restaurant)
     
     # Sort
-    results = results['results'][:13]  # 只取前13个结果
-    # restaurants.sort(key=lambda x: x["Rating"], reverse=True)
-    # restaurants是字典数组
+    results = results['results'][:13]  # Only take the first 13 results
     restaurants = restaurants[0:num] if len(restaurants) > num else restaurants    
 
-    async def process_restaurant(restaurant, city):
-        average_cost, extra_info = await get_restaurant_average_cost_async(city + " " + restaurant['Name'])
-        description_value, description_info = await get_entity_attribute_async(city + " " + restaurant['Name'], 'types of cuisine', '')
-        restaurant['average_cost'] = average_cost
-        restaurant['description'] = description_value
-        return restaurant
-
-    async def process_all_restaurants(restaurants, city, num):
-        tasks = [process_restaurant(restaurant, city) for restaurant in restaurants[:num]]
-        processed_restaurants = await asyncio.gather(*tasks)
-        
-        str_answer = ""
-        for index, restaurant in enumerate(processed_restaurants):
-            str_answer += (f"{index + 1}. {restaurant['Name']}({restaurant['Address']}), "
-                        f"rating: {restaurant['Rating']}, Average Cost: {restaurant.get('average_cost', '25$')}. "
-                        f"{restaurant.get('description', '')}\n")
-        
-        return str_answer
-
-    str_answer = await process_all_restaurants(restaurants, city, num)
-
-    return str_answer # todo 用amadeus api 获取真正的POI 信息
-
-def get_restaurants(city, language=GLOBAL_LANGUAGE, num=10):
-    return asyncio.run(get_restaurants_async(city, language, num))
-
-def google_get_accommodations(city, language=GLOBAL_LANGUAGE, num=10):
-    # Get the latitude and longitude of the city
-    geocode_result = gmaps.geocode(city)
-    lat = geocode_result[0]['geometry']['location']['lat']
-    lng = geocode_result[0]['geometry']['location']['lng']
-    # Execute search
-    results = gmaps.places(query=f"accommodations in {city}", 
-                           location=(lat, lng),
-                           language=language,
-                           type="lodging")
-    
-    # Extract results
-    accommodations = []
-    for place in results.get('results', []):
-        accommodation = {
-            "Name": place.get('name'),
-            "Address": place.get('formatted_address').split(' 邮政编码')[0],
-            # "Price": get_accommodation_price(place.get('name')),
-            "Rating": place.get('rating'),
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(num, 10)) as executor:
+        # 1. Concurrently get average cost for restaurants
+        future_to_restaurant = {
+            executor.submit(get_restaurant_average_cost, city + " " + restaurant['Name']): restaurant
+            for restaurant in restaurants[:num]
         }
-        # Add to the list if rating is not 0
-        if accommodation["Rating"] > 0:
-            accommodations.append(accommodation)
-    
-    # Sort
-    accommodations.sort(key=lambda x: x["Rating"], reverse=True)
-    accommodations = accommodations[0:num] if len(accommodations) > num else accommodations   
-    str_answer = ""
-    for index, accommodation in enumerate(accommodations):
-        str_answer += f"{index+1}. {accommodation['Name']}({accommodation['Address']}), rating: {accommodation['Rating']}\n"
-    return str_answer
+        
+        # 2. Concurrently get restaurant descriptions
+        future_to_description = {
+            executor.submit(get_entity_attribute, city + " " + restaurant['Name'], 'types of cuisine', ''): restaurant
+            for restaurant in restaurants[:num]
+        }
+
+        str_answer = ""
+
+        # 3. Collect all Future objects
+        all_futures = list(future_to_restaurant.keys()) + list(future_to_description.keys())
+
+        # 4. Process all completed tasks
+        for index, future in enumerate(concurrent.futures.as_completed(all_futures)):
+            if future in future_to_restaurant:
+                # Process average cost for restaurant
+                restaurant = future_to_restaurant[future]
+                try:
+                    average_cost, extra_info = future.result()
+                except Exception as exc:
+                    print(f'Error generating average price for {restaurant["Name"]}: {exc}')
+                    average_cost = "25$"
+                
+                # Store restaurant information for later use
+                restaurant['average_cost'] = average_cost
+
+            elif future in future_to_description:
+                # Process restaurant description
+                restaurant = future_to_description[future]
+                try:
+                    description_value, description_info = future.result()
+                except Exception as exc:
+                    print(f'Error getting description for {restaurant["Name"]}: {exc}')
+                    description_value = ""
+                
+                # Store description information for later use
+                restaurant['description'] = description_value
+
+        # 5. Build final result string
+        for index, restaurant in enumerate(restaurants[:num]):
+            str_answer += (f"{index + 1}. {restaurant['Name']}, "
+                        f"rating: {restaurant['Rating']}, Average Cost /person: {restaurant.get('average_cost', '25$')}. "
+                        f"{restaurant.get('description', '')}\n"
+                        )
+
+    if str_answer == "":
+        return f"There are no restaurants found in {city}."
+    return str_answer # todo use amadeus api to get real POI information
+
 
 def get_distance_matrix(origin, destination, mode, language=GLOBAL_LANGUAGE):
     # Origin lat, lng
@@ -231,20 +253,14 @@ def get_distance_matrix(origin, destination, mode, language=GLOBAL_LANGUAGE):
     return f"{mode.capitalize()}, from {origin} to {destination}, duration: {duration}, distance: {distance}"
 
 
-from amadeus import Client, ResponseError, Location
 
-amadeus = Client(
-    client_id=os.getenv("AMADEUS_API_KEY"),
-    client_secret=os.getenv("AMADEUS_API_SECRET"),
-    hostname='production'
-)
 
 def get_flights(origin, destination, date):
     try:
-        # 先翻译
+        # Translate first
         origin = translate_city(origin)
         destination = translate_city(destination)
-        # 获取 IATA 代码
+        # Get IATA codes
         print("origin, destination:", origin, destination)
         origin_code = amadeus.reference_data.locations.get(
             keyword=origin,
@@ -257,14 +273,14 @@ def get_flights(origin, destination, date):
         ).data[0]['iataCode']
         print("origin_code, destination_code:", origin_code, destination_code)
         print("date:", date)
-        # 获取航班信息
+        # Get flight information
         response = amadeus.shopping.flight_offers_search.get(
             originLocationCode=origin_code,
             destinationLocationCode=destination_code,
             departureDate=date, # format: '2024-11-01'
             adults=1,
             currencyCode=GLOBAL_CURRENCY,
-            max=5  # 增加返回的航班数量
+            max=5  # Increase the number of returned flights
         )
 
         flights_info = []
@@ -286,57 +302,20 @@ def get_flights(origin, destination, date):
         flights_str = ""
         for flight in flights_info:
             flights_str += f"Flight number {flight['Flight Number']}, {flight['Departure Time']}-{flight['Arrival Time']}, price: {flight['Price']}/person\n"
+        
+        if flights_str == "":
+            return f"There are no flights found from {origin} to {destination} on {date}."
         return flights_str
 
     except ResponseError as error:
         print(error)
 
 if __name__ == "__main__":
-    # print(get_distance_matrix("New York", "Los Angeles", "driving"))
-    # print(get_flights("nanjing", "beijing", "2024-10-10"))
-    # tool_invocation: get_flights
-    # tool_input: {'origin': 'St. Petersburg', 'destination': 'Rockford', 'departure_date': '2022-03-16'}
-    # print(get_flights("St. Petersburg", "Rockford", "2024-10-11"))
-    # Atlanta to Orlando, Fri, Nov 8 <-> Thu, Nov 14
-    # print(get_flights("Atlanta", "MCO", "2024-11-08"))
-    # print(get_restaurants("中山"))
-    # print(get_distance_matrix("中山", "广州", "driving"))
-    # accomodations = get_accommodations("桂林")
-#     result = get_accommodations(
-#         city='KWL',  # 桂林的IATA城市代码
-#         check_in_date='2024-10-11',
-#         check_out_date='2024-10-12',
-#         adults=2,
-#         rooms=1,
-#         currency=GLOBAL_CURRENCY,
-#         language=GLOBAL_LANGUAGE,
-#         max_results=20
-# )
-
-#     print(result)
-    # [1]<Tool Invocation:get_flights/>
-    # tool_invocation: get_flights
-    # tool_input: {'origin': '广州', 'destination': '桂林', 'departure_date': '2024-10-12'}
-    # print(get_flights("中山", "桂林", "2024-10-13"))
-    # origin_code = amadeus.reference_data.locations.get(
-    #     keyword="zhongshan",
-    #     subType=Location.ANY
-    # ).data[0]['iataCode']
-    # print("origin_code:", origin_code)
-    # print(get_attractions("中山"))
     import time
     
     start_time = time.time()
-    result = get_restaurants("中山")
+    result = get_attractions("中山")
     end_time = time.time()
     
     print(result)
-    print(f"运行时间: {end_time - start_time:.2f} 秒")
-    # print(get_restaurant_average_cost("椿记烧鹅"))
-    
-    # results = gmaps.places(query=f"specialty restaurants in 中山", 
-    #                     location=(22.5152, 113.3924),
-    #                     language="zh-CN",
-    #                     type="restaurant",
-    #                     )
-    # print(results)
+    print(f"Runtime: {end_time - start_time:.2f} seconds")

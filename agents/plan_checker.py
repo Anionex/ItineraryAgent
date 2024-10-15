@@ -1,6 +1,6 @@
 from chat_model import OpenAIChat
 from prompts import PLAN_CHECKER_PROMPT
-
+from config import *
 
 class PlanChecker:
     def __init__(self, **kwargs) -> None: 
@@ -13,6 +13,8 @@ class PlanChecker:
 
     def build_system_input(self, query, extra_requirements):
         sys_prompt = PLAN_CHECKER_PROMPT.format(query=query, extra_requirements=extra_requirements)
+        if GLOBAL_LANGUAGE != "en":
+            sys_prompt += f"\n请你使用{GLOBAL_LANGUAGE}（代号）作为输出语言"
         return sys_prompt
     
     def check_plan(self, plan, query, extra_requirements=''):
