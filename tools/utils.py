@@ -9,9 +9,10 @@ from langchain_community.utilities import GoogleSerperAPIWrapper
 search = GoogleSerperAPIWrapper()
 from agents.chat_model import OpenAIChat
 from langchain_openai import ChatOpenAI
+from functools import lru_cache
 search = GoogleSerperAPIWrapper()
-# llm = OpenAIChat(model="gemini-1.5-flash-002")
-llm = OpenAIChat(model="gpt-4o-mini")
+llm = OpenAIChat(model="gemini-1.5-flash-002")
+# llm = OpenAIChat(model="gpt-4o")
 # llm.client = OpenAI(
 #     api_key=os.getenv("GROQ_OPENAI_API_KEY"),
 #     base_url=os.getenv("GROQ_OPENAI_API_BASE"),
@@ -24,6 +25,7 @@ llm = OpenAIChat(model="gpt-4o-mini")
 
 from translate import Translator
 
+@lru_cache()
 def translate_city(city_name): # temporary method
     if not any('\u4e00' <= char <= '\u9fff' for char in city_name):
         return city_name  # 如果不包含中文字符，直接返回原名
@@ -39,7 +41,13 @@ def translate_city(city_name): # temporary method
 import requests
 import json
 
+def parse_itinerary(itinerary):
+    parser = OpenAIChat(model='gpt-4o', temperature=0)
+    response, _ = parser.chat(prompt=itinerary, history=[], meta_instruction="Keep the METADATA and itinerary sections as they are, remove other extraneous information, such as budget summaries. Do not output anything else!")
+    return response
+
 import concurrent.futures
+@lru_cache()
 def relavant_with_query(title,content, query):
     relavant_with_query_system_prompt = "You focus on determining whether information about the query is relavant to a given website. If possible, return 'yes', otherwise return 'no'. Do not output anything else!"
     # relavant_with_query_system_prompt = "You focus on determining whether a search result contains direct or indirect information about the query. If it does, return 'yes', otherwise return 'no'. Do not output anything else!"
@@ -47,6 +55,7 @@ def relavant_with_query(title,content, query):
     # print("query:", query, "title:", title, "completion:", completion)
     return "yes" in completion.lower(), "query:"+query+"\ntitle:"+title+"\ncontent:"+content+"\ncompletion:"+completion+'\n'
 
+@lru_cache()
 def filter_search_results(search_results, query):
     extra_info = ""
     # only remain title and content 
@@ -74,7 +83,7 @@ def filter_search_results(search_results, query):
 
     return short_search_results, extra_info
 
-
+@lru_cache()
 def get_restaurant_average_cost(restaurant_name):
     extra_info = ""
     query = f"{restaurant_name} average cost 人均 价格"
@@ -91,7 +100,7 @@ def get_restaurant_average_cost(restaurant_name):
     extra_info += "\nfiltered search results: " + str(filtered_search_results)
     get_restaurant_average_cost_system_prompt = """You focus on extracting average cost information for a restaurant from web search results and returning the average cost data.
 The final answer should be returned in JSON format, with the following schema:{"inference": "The inference process for determining the average cost in 20 words", "average_cost": "A number + currency unit expressing the average cost */person*.set it to $25 if no relevant information is found"}
-If the currency type is not provided, please infer it from the search results context. Do not output anything other than the JSON format answer!
+If the currency type is not provided, please infer it from the search results context. Do not output anything other than the JSON format answer!return cost for a single person.if there is no such information, return '25$' rather than a uncertain range!
     """
     completion = llm.chat('average cost search results:\n' + str(filtered_search_results), [], get_restaurant_average_cost_system_prompt)[0]
     # print("completion:", completion)
@@ -101,8 +110,8 @@ If the currency type is not provided, please infer it from the search results co
         return "25$", extra_info
     return completion.split('average_cost":')[1].split('}')[0].strip().strip('"'), extra_info
 
-
-def get_entity_attribute(entity_name, attribute, default_value)->tuple[str, str]:
+@lru_cache()
+def get_entity_attribute(entity_name, attribute, default_value, extra_requirements="")->tuple[str, str]:
     """
     return the attribute value and extra information
     parameter:
@@ -120,13 +129,14 @@ def get_entity_attribute(entity_name, attribute, default_value)->tuple[str, str]
     headers={'X-API-KEY': os.getenv("SERPER_API_KEY"),'Content-Type': 'application/json'}, 
     data=payload)
     filtered_search_results, extra_info = filter_search_results(response.text, query)
+    # print("filtered_search_results:", str(filtered_search_results))
     filtered_search_results = filtered_search_results[:SEARCH_REMAIN_NUM]
     extra_info += f"\nFiltered search results: {str(filtered_search_results)}"
     
     get_attribute_system_prompt = f"""Your task is to extract information about the {attribute} of {entity_name} from web search results.
 Please return the final answer in JSON format as follows: {{"inference": "Brief description of the inference process for determining the {attribute}", "{attribute}": "Extracted {attribute} information.Should be within 20 words"}}
 If no relevant information is found, set it to "{default_value}". Do not output anything other than the JSON format answer!
-    """
+{extra_requirements}   """
     completion = llm.chat(f'{attribute} search results:\n{str(filtered_search_results)}', [], get_attribute_system_prompt)[0]
     extra_info += f"\nCompletion result: {completion}\n"
     

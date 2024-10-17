@@ -73,8 +73,8 @@ class ReactAgent:
 
     
     def step(self, scratchpad):
-        # return self.model.create_assistant_completion(scratchpad, meta_instruction=self.system_prompt)
-        return self.model.chat(scratchpad, [], self.system_prompt)[0]
+        return self.model.create_assistant_completion(scratchpad, meta_instruction=self.system_prompt)
+        # return self.model.chat(scratchpad, [], self.system_prompt)[0]
 
       
     def run(self, query, extra_requirements="", system_prompt=REACT_PROMPT):
@@ -89,13 +89,6 @@ class ReactAgent:
             if response.startswith(ANSWER_HEADER):
                 print("=====\nGET AN ITINERARY\n=====")
                 self.hit_final_answer = True
-                
-                # 取消只能输出一行的限制(stop=['\n'])，重新获取response
-                # self.kwargs['stop'] = None
-                # self.model.kwargs = self.kwargs
-                self.scratchpad += '\n' + ANSWER_HEADER
-                response = self.step(self.scratchpad)
-                
             elif response.startswith(THOUGHT_HEADER):
                 pass
             elif is_tool_input:

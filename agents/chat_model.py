@@ -3,29 +3,17 @@ import dotenv
 import os
 import time
 from tenacity import retry, stop_after_attempt, wait_exponential
-from openai import OpenAI, AsyncOpenAI
+from openai import OpenAI
 from openai import APIError, RateLimitError
 
 dotenv.load_dotenv()
 
-class BaseModel:
-    def __init__(self, path: str = '') -> None:
-        self.path = path
-
-    def chat(self, prompt: str, history: List[dict]):
-        pass
-
-    def load_model(self):
-        pass
-    
-# if os.getenv('LANGFUSE_SECRET_KEY'):
-#     from langfuse.openai import OpenAI
-# else:
-#     from openai import OpenAI
-from openai import OpenAI, AsyncOpenAI
-class OpenAIChat(BaseModel):
+if os.getenv('LANGFUSE_SECRET_KEY'):
+    from langfuse.openai import OpenAI
+else:
+    from openai import OpenAI
+class OpenAIChat():
     def __init__(self, path: str = '', **kwargs) -> None:
-        super().__init__(path)
         self.load_model(**kwargs)
         self.kwargs = kwargs
 
@@ -34,24 +22,23 @@ class OpenAIChat(BaseModel):
             api_key=os.getenv("OPENAI_API_KEY"),
             base_url=os.getenv("OPENAI_API_BASE"),
         )
-        self.async_client = AsyncOpenAI(
-            api_key=os.getenv("OPENAI_API_KEY"),
-            base_url=os.getenv("OPENAI_API_BASE"),
-        )
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def _make_api_call(self, messages):
+        # 去除is_verbose
+        kwargs = self.kwargs.copy()
+        kwargs.pop('is_verbose', None)
         try:
             return self.client.chat.completions.create(
                 messages=messages,
                 stream=True,
-                **self.kwargs
+                **kwargs
             )
         except (APIError, RateLimitError) as e:
-            print(f"API调用出错: {str(e)}. 正在重试...")
+            print(f"error: {str(e)}. retry...")
             raise  # 重新抛出异常以触发重试
 
-    def chat(self, prompt: str, history: List[dict], meta_instruction:str ='') -> Tuple[str, List[dict]]:
+    def chat(self, prompt: str, history: List[dict] = [], meta_instruction:str ='') -> Tuple[str, List[dict]]:
         """
         normal chat
         """
@@ -72,28 +59,13 @@ class OpenAIChat(BaseModel):
                     full_response += chunk.choices[0].delta.content
             if is_verbose:
                 print()
+            history.append({"role": "user", "content": prompt})
+            history.append({"role": "assistant", "content": full_response})
             return full_response, history
         except Exception as e:
-            print(f"聊天过程中发生错误: {str(e)}")
-            return f"抱歉,发生了错误: {str(e)}", history
+            print(f"error: {str(e)}")
+            return f"error: {str(e)}", history
     
-    """
-    异步版本的聊天函数
-    """
-    async def achat(self, prompt: str, history: List[dict], meta_instruction:str ='') -> Tuple[str, List[dict]]:
-
-        messages = []
-        if meta_instruction:
-            messages.append({"role": "system", "content": meta_instruction})
-        messages.extend(history)
-        messages.append({"role": "user", "content": prompt})
-        
-        response = await self.async_client.chat.completions.create(
-            messages=messages,
-            **self.kwargs
-        )
-        
-        return response.choices[0].message.content, history
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def create_assistant_completion(self, scratchpad:str, meta_instruction:str ='') -> str:
@@ -118,8 +90,8 @@ class OpenAIChat(BaseModel):
                 print()
             return full_response
         except Exception as e:
-            print(f"创建助手完成时发生错误: {str(e)}")
-            return f"抱歉,发生了错误: {str(e)}"
+            print(f"error: {str(e)}")
+            return f"error: {str(e)}"
 
 if __name__ == '__main__':
 

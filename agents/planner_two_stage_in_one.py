@@ -12,23 +12,23 @@ from config import *
 planner_two_stage_in_one = ReactAgent(model="gpt-4o", stop=['>']) # import this
 
 
-planner_two_stage_in_one.tools.add_tool(
-    name_for_human="calculator",
-    name_for_model="calculator",
-    func=calculator,
-    description="Used whenever you need to perform mathematical calculations.",
-    parameters=[
-        {
-            'name': 'expression',
-            'description': 'Arithmetic expression that may include parentheses',
-        }
-    ]
-)  
+# planner_two_stage_in_one.tools.add_tool(
+#     name_for_human="calculator",
+#     name_for_model="calculator",
+#     func=calculator,
+#     description="Used whenever you need to perform mathematical calculations.",
+#     parameters=[
+#         {
+#             'name': 'expression',
+#             'description': 'Arithmetic expression that may include parentheses',
+#         }
+#     ]
+# )  
 planner_two_stage_in_one.tools.add_tool(
     name_for_human="google search",
     name_for_model="google_search",
     func=google_search,
-    description="A general search engine for accessing the internet. Commonly used when other tools cannot obtain information.",
+    description="A general search engine for accessing the internet. Commonly used when other tools cannot obtain information.Never use it unless absolutely necessary.",
     parameters=[
         {
             'name': 'search_query',
@@ -97,11 +97,11 @@ planner_two_stage_in_one.tools.add_tool(
     parameters=[
         {
             'name': 'origin',
-            'description': 'Departure city',
+            'description': 'Departure city.keep it concise',
         },
         {
             'name': 'destination',
-            'description': 'Destination city',
+            'description': 'Destination city.keep it concise',
         },
         {
             'name': 'departure_date',
@@ -113,7 +113,7 @@ planner_two_stage_in_one.tools.add_tool(
     name_for_human="Get Distance and Time Information",
     name_for_model="get_google_distance_matrix",
     func=get_google_distance_matrix,
-    description="Used whenever you need to retrieve distance and travel time information between two locations.",
+    description="Used whenever you need to retrieve distance or travel time information between two locations.",
     parameters=[
         {
             'name': 'origin',
@@ -130,10 +130,8 @@ planner_two_stage_in_one.tools.add_tool(
     ]
 ) 
 
-# 初始化scratchpad内容
-planner_two_stage_in_one.scratchpad = """Begin！
-<Analysis:为了创建一个全面的旅行计划, 需要先确定本次行程的基本信息，包括预算、天数、城市、景点偏好、用餐偏好等。若用户未提供某项信息，我将通过实际情况酌情设定。>
-"""
+# init scratchpad content
+planner_two_stage_in_one.scratchpad = PLANNER_BEGIN_WORDS
 if __name__ == '__main__':
 
     # result = agent.run("马斯克发射了多少颗卫星？")

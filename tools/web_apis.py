@@ -9,7 +9,7 @@ dotenv.load_dotenv()
 import os
 import sys
 import concurrent.futures
-
+from functools import lru_cache
 current_dir = os.path.dirname(__file__)
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 
@@ -26,11 +26,12 @@ amadeus = Client(
     client_secret=os.getenv("AMADEUS_API_SECRET"),
     hostname='production'
 )
-def get_accommodations(city, check_in_date, check_out_date, adults, rooms=1, currency=GLOBAL_CURRENCY, language=GLOBAL_LANGUAGE, max_results=30):
+@lru_cache()
+def get_accommodations(city, check_in_date, check_out_date, adults, rooms=1, currency=GLOBAL_CURRENCY, language=GLOBAL_LANGUAGE, max_results=15):
 
     try:
         # Translate first
-        city = translate_city(city)
+        # city = translate_city(city)
         # get city code
         city_code = amadeus.reference_data.locations.get(
             keyword=city,
@@ -72,7 +73,7 @@ def get_accommodations(city, check_in_date, check_out_date, adults, rooms=1, cur
                             hotelIds=hotel_id
                         )
                         # print(f"hotel_rating for {hotel_id}:", str(hotel_rating.data))
-                        rating = hotel_rating.data[0]['overallRating'] if hotel_rating.data else "N/A"
+                        rating = (float(hotel_rating.data[0]['overallRating']) / 20) if hotel_rating.data else "N/A"
                     except ResponseError:
                         rating = "N/A"
                     if rating != "N/A":
@@ -89,6 +90,7 @@ def get_accommodations(city, check_in_date, check_out_date, adults, rooms=1, cur
     except ResponseError as error:
         return f"An error occurred: {error}"
 
+@lru_cache()
 def get_attractions(city, language=GLOBAL_LANGUAGE, num=10):
     # Get the latitude and longitude of the city
     geocode_result = gmaps.geocode(city)
@@ -98,28 +100,25 @@ def get_attractions(city, language=GLOBAL_LANGUAGE, num=10):
     results = gmaps.places(query=f"attractions in {city}", 
                            location=(lat, lng),
                            language=language,
-                           type="tourist_attraction",
+                           type=f"must-visit attractions in {city}",
                            )
     
     # Extract results
     attractions = []
-    for place in results.get('results', []):
+    for place in results.get('results', [])[:num]:
         attraction = {
             "Name": place.get('name'),
-            "Address": place.get('formatted_address').split(' 邮政编码')[0],
+            # "Address": place.get('formatted_address').split(' 邮政编码')[0],
             "Rating": place.get('rating'),
         }
         # Add to the list if rating is not 0
         if attraction["Rating"] > 0:
             attractions.append(attraction)        
     
-    # Sort
-    attractions.sort(key=lambda x: x["Rating"], reverse=True)
-    attractions = attractions[0:num] if len(attractions) > num else attractions
     # Concurrently get ticket prices for attractions
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(num, 10)) as executor:
         future_to_price = {
-            executor.submit(get_entity_attribute, attraction['Name'], 'ticket price', 'free'): attraction
+            executor.submit(get_entity_attribute, attraction['Name'], 'ticket price', 'free', "return cost for a single person.if there is no such information, return 'free' rather than a uncertain range.Your output should be a single number+currency code, e.g. 25$"): attraction
             for attraction in attractions[:num]
         }
         
@@ -133,20 +132,20 @@ def get_attractions(city, language=GLOBAL_LANGUAGE, num=10):
     
     str_answer = ""
     for index, attraction in enumerate(attractions):
-        str_answer += f"{index+1}. {attraction['Name']}, rating: {attraction['Rating']}, cost: {attraction.get('Ticket Price', 'free')}\n"
+        str_answer += f"{index+1}. {attraction['Name']}, rating: {attraction['Rating']}, cost/person: {attraction.get('Ticket Price', 'free')}\n"
     
     if str_answer == "":
         return f"There are no attractions found in {city}."
     return str_answer
 
-
+@lru_cache()
 def get_restaurants(city, language=GLOBAL_LANGUAGE, num=10):
     # Get the latitude and longitude of the city
     geocode_result = gmaps.geocode(city)
     lat = geocode_result[0]['geometry']['location']['lat']
     lng = geocode_result[0]['geometry']['location']['lng']
     # Execute search
-    results = gmaps.places(query=f"specialty restaurants in {city}", 
+    results = gmaps.places(query=f"must-visit restaurants in {city}", 
                            location=(lat, lng),
                            language=language,
                            type="restaurant",
@@ -155,40 +154,28 @@ def get_restaurants(city, language=GLOBAL_LANGUAGE, num=10):
     # Extract results
     restaurants = []
     for place in results.get('results', []):
-        # use place_id to get more information
-        # overview = ""
-        # try:
-        #     place_id = place.get('place_id')
-        #     details = gmaps.place(place_id=place_id)
-        #     overview = details.get('result').get('editorial_summary').get('overview')
-        # except:
-        #     pass
-        restaurant = {
-            "Name": place.get('name'),
-            "Address": place.get('formatted_address').split(' 邮政编码')[0],
-            "Rating": place.get('rating'),
-            # "Editorial Summary": overview
-        }
         # Add to the list if rating is not 0
-        # return place, details
-        if restaurant["Rating"] > 0:
-            restaurants.append(restaurant)
+        if place.get('rating') > 0:
+            restaurants.append({
+                "Name": place.get('name'),
+                # "Address": place.get('formatted_address').split(' 邮政编码')[0].strip(),
+                "Rating": place.get('rating'),
+                # "Editorial Summary": overview
+            })
+            if len(restaurants) == num:
+                break
     
-    # Sort
-    results = results['results'][:13]  # Only take the first 13 results
-    restaurants = restaurants[0:num] if len(restaurants) > num else restaurants    
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(num, 10)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(restaurants), 10)) as executor:
         # 1. Concurrently get average cost for restaurants
         future_to_restaurant = {
-            executor.submit(get_restaurant_average_cost, city + " " + restaurant['Name']): restaurant
-            for restaurant in restaurants[:num]
+            executor.submit(get_restaurant_average_cost, f"{city} {restaurant['Name']}"): restaurant
+            for restaurant in restaurants
         }
         
         # 2. Concurrently get restaurant descriptions
         future_to_description = {
-            executor.submit(get_entity_attribute, city + " " + restaurant['Name'], 'types of cuisine', ''): restaurant
-            for restaurant in restaurants[:num]
+            executor.submit(get_entity_attribute, f"{city} {restaurant['Name']}", 'types of cuisine', ''): restaurant
+            for restaurant in restaurants
         }
 
         str_answer = ""
@@ -225,7 +212,7 @@ def get_restaurants(city, language=GLOBAL_LANGUAGE, num=10):
         # 5. Build final result string
         for index, restaurant in enumerate(restaurants[:num]):
             str_answer += (f"{index + 1}. {restaurant['Name']}, "
-                        f"rating: {restaurant['Rating']}, Average Cost /person: {restaurant.get('average_cost', '25$')}. "
+                        f"rating: {restaurant['Rating']}, Average Cost/person: {restaurant.get('average_cost', '25$')}. "
                         f"{restaurant.get('description', '')}\n"
                         )
 
@@ -233,7 +220,7 @@ def get_restaurants(city, language=GLOBAL_LANGUAGE, num=10):
         return f"There are no restaurants found in {city}."
     return str_answer # todo use amadeus api to get real POI information
 
-
+@lru_cache()
 def get_distance_matrix(origin, destination, mode, language=GLOBAL_LANGUAGE):
     # Origin lat, lng
     geocode_result = gmaps.geocode(origin)
@@ -252,23 +239,22 @@ def get_distance_matrix(origin, destination, mode, language=GLOBAL_LANGUAGE):
     distance = distance_matrix['rows'][0]['elements'][0]['distance']['text']
     return f"{mode.capitalize()}, from {origin} to {destination}, duration: {duration}, distance: {distance}"
 
-
-
-
+AMADEUS_MAX_LENGTH = 28
+@lru_cache()
 def get_flights(origin, destination, date):
     try:
         # Translate first
-        origin = translate_city(origin)
-        destination = translate_city(destination)
+        # origin = translate_city(origin)
+        # destination = translate_city(destination)
         # Get IATA codes
         print("origin, destination:", origin, destination)
         origin_code = amadeus.reference_data.locations.get(
-            keyword=origin,
+            keyword=origin[:AMADEUS_MAX_LENGTH],
             subType=Location.ANY
         ).data[0]['iataCode']
 
         destination_code = amadeus.reference_data.locations.get(
-            keyword=destination,
+            keyword=destination[:AMADEUS_MAX_LENGTH],
             subType=Location.ANY
         ).data[0]['iataCode']
         print("origin_code, destination_code:", origin_code, destination_code)
@@ -314,7 +300,8 @@ if __name__ == "__main__":
     import time
     
     start_time = time.time()
-    result = get_attractions("中山")
+    result = get_attractions("Hongkong", num=10)
+    # result = get_flights("St. Petersburg", "Chicago O'Hare International Airport", "2024-10-17")
     end_time = time.time()
     
     print(result)
