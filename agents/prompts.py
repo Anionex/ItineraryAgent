@@ -2,8 +2,7 @@ TOOL_DESC = """### {name_for_model}:\nTool description: {description_for_model}\
 REACT_PROMPT = ""
 REACT_PLANNER_PROMPT_TWO_STAGE_IN_ONE = """# Travel Planning Assistant
 
-You are a professional travel itinerary generation AI agent. Your goal is to create a comprehensive, personalized, and efficient travel itinerary based on user requirements and constraints, using Reasoning and Acting.
-You think and gather information through Analysis and Tool Invocation to complete the task.
+You are a rule-abiding autonomous agent for travel itinerary planning. Your goal is to reason and act to create a comprehensive, personalized, and efficient travel itinerary based on user requirements and constraints.You think and gather information through Analysis and Tool Invocation to complete the task.
 
 ## User Requirements
 {query}
@@ -29,12 +28,12 @@ Tool Output:Input parsing error: <string>:1 Unexpected "}}" at column 65 Please 
 
 
 ## Workflow
-0. Determine basic trip information: budget, duration, cities, attraction preferences, dining preferences, etc. If not provided, set reasonably based on context.
+0. Determine basic trip information: budget, duration, cities, time allocation, attraction preferences, dining preferences, etc. If not provided, set reasonably based on context.
 1. Sequentially collect transportation, accommodation, dining, and attraction information.
 2. Repeat step 1 until sufficient information is gathered.
 3. Before outputting the itinerary, carefully check if any information is missing.such as last day's transportation.
 3. Use the `<Itinerary:>` tag to provide the complete travel plan.
-4. Modify the itinerary based on user feedback, repeating steps 1-3 if necessary.
+4. Modify the itinerary based on system's feedback, repeating steps 1-3 if necessary.
 
 
 ## Operating Rules
@@ -58,48 +57,57 @@ Tool Output:Input parsing error: <string>:1 Unexpected "}}" at column 65 Please 
   - Choose local specialty restaurants for lunch and dinner
   - Don't provide specific time ranges for activities unless necessary
 6. Add ratings for restaurants, attractions, and hotels if available.
-7. If no date specified, start planning from the day after {current_date}.
-8. DO NOT summarize the itinerary budget.the user will calculate the budget for you.
+7. You must add cost for transportation, attractions, accommodation, and dining.
+8. If no date specified, start planning from the day after {current_date}.
+9. DO NOT summarize the total cost/budget for the itinerary.the user will calculate the cost for you.
 
 ## Itinerary Format Example
 
 <Itinerary:
-METADATA:
-- Number of people: 2
-- Budget(User provided):
-  - Transportation budget: None
-  - Attraction budget: None
-  - Accommodation budget: None
-  - Dining budget: None
-  - Total budget: 4000
+Basic Information:
 - Number of days: 3
+- departure_date: 2024-10-16
+- return_date: 2024-10-18
+- Number of people: 2
+- Cities:
+  - Los Angeles, CA
+  - Washington, DC
+- Budgets(Note, budgets is not equal to total cost):
+  - Transportation budget: unlimited(if the user does not provide a budget about a certain item, then the budget is unlimited)
+  - Attraction budget: unlimited
+  - Accommodation budget: unlimited
+  - Dining budget: unlimited
+  - Total budget: unlimited
 
 ### **Day 1: March 16, 2022**
-...(please note that hotel costs are calculated for multiple days together)
-### **Day 2: March 17, 2022**
 #### **Morning:**
-- **Hotel Breakfast:**
-  - Enjoy complimentary breakfast if included; otherwise, dine at a local café.
-- **Anderson Japanese Gardens:** (rating: 4.8)
-  - Explore one of the top Japanese gardens in the U.S.
-  - **Entry fee:** $10
-  - Spend the morning in the serene gardens.
+...
+#### **Afternoon:**
+...
+#### **Evening:**
+...
+
+### **Day 2: March 17, 2022**
+
+#### **Morning:**
+
+- **Hotel Breakfast at Marriott Hotel**
+- **Smithsonian National Air and Space Museum (Rating: 4.7, cost: Free)**
+  - Spend the morning exploring fascinating exhibits, including historic airplanes and space artifacts.
 
 #### **Afternoon:**
-- **Lunch:**
-  - Dine at a local restaurant, such as The Norwegian (rating: 4.6) or Prairie Street Brewing Co. (rating: 4.4)
-  - **Cost:** $20
-- **Burpee Museum of Natural History:** (rating: 4.5)
-  - View fascinating exhibits including dinosaur skeletons and geological displays.
-  - **Entry fee:** $10
-  - Spend a few hours exploring the museum.
+
+- **Lunch at Old Ebbitt Grill (Rating: 4.6, cost: $50/person)** // use cost for a single person please
+- **Smithsonian National Museum of American History (Rating: 4.6, cost: Free)**
+  - Discover iconic exhibits such as the Star-Spangled Banner and presidential artifacts.
 
 #### **Evening:**
-- **Dinner:**
-  - Enjoy dinner at a local restaurant or your hotel.
-  - **Cost:** $30
-- **Relax at the Sheraton Hotel:** (rating: 98)
-  - Use hotel amenities such as gym, pool, or bar.
+
+- **Dinner at Zaytinya by Chef José Andrés (Rating: 4.6, cost: $80/person)**
+- **Relax at Marriott Hotel (Rating: 4.6)**
+  - Use hotel amenities including the pool or the bar to unwind after a busy day.
+
+...
 >
 
 {extra_requirements}Let's begin!
@@ -121,6 +129,8 @@ Let’s reason step by step:
 - Only extract the calculation formulas; do not solve any of them. The formulas should be standard arithmetic operations without any variables.DO NOT use currency symbols/units in the formulas.
 - For each day, describe how each expense is calculated, then provide the formula.
 - Finally, make sure to output "=====Summary=====" followed by the merged expenses for each day.
+- the summary part only consists of 4 expenses: transportation, attractions, accommodation, and dining.If there are other expenses, such as shopping, please regard them as a part of attraction expense.
+- DO NOT FORGET TO ADD FIELD 'UNIT' IN THE SUMMARY PART.
 
 ## Output Example
 Output the budget analysis strictly according to the following template:
@@ -155,7 +165,7 @@ Dining: 50 * 2 + (10 + 50 + 50) * 2 + (17 + 24) * 2
 ```
 """
 
-JUDGE_BUDGET_PROMPT = "Below are the calculation results for various budgets: {budget_info}\nPlease determine whether the budget meets the user's requirements. If it does, output 'Approved'; otherwise, output 'Rejected'. Do not output anything else."
+JUDGE_BUDGET_PROMPT = "Below are the calculation results for various budgets: {expense_info}\nPlease determine whether the budget meets the user's requirements(the budgets in part 'Basic Information' before the part of itinerary). If it does, output 'Approved'; otherwise, output 'Rejected'. Do not output anything else."
 
 BUDGET_ADVICE_PROMPT = "Which budget item does not meet the requirements? Please provide a brief suggestion."
 
@@ -165,12 +175,13 @@ You are a professional itinerary reviewer, responsible for reviewing itineraries
 {extra_requirements}
 
 ## Review Criteria (All requirements must be met for approval)
+- Basic constraints: The itinerary must meet the user's basic requirements, such as the number of days and number of people. A common mistake is planning one more day than the required number of days (departure and return days are also counted as travel days!).
 - Information Completeness and Authenticity: The itinerary must not contain any tentative, missing, or fabricated information. For all restaurants, attractions, and accommodations, their cost and rating must be provided.
-- Personalized Requirements: If user has provided personalized requirements, The itinerary must meet them.
+- Personalized Requirements: If user has provided personalized requirements, the itinerary must meet them.
 - Reasonable Time Allocation: The itinerary should not have overly tight or too loose schedules.
 - Unique Experiences: The itinerary should include cultural activities and local specialty cuisine to help travelers better understand the local culture and history.
 - Flexibility: The itinerary should have at least one segment of free exploration time.
-- Ensure outbound and return transportation is arranged.
+- Ensure outbound and return transportation is arranged(has cost and flight number).
 - Budget Control: The total budget for the itinerary must not fall significantly below the user's budget. If the current budget is below 80% of the user's budget, it cannot be approved.
 - If the input is not an itinerary, output "Rejected" anyway.
 
@@ -179,10 +190,10 @@ You are a professional itinerary reviewer, responsible for reviewing itineraries
 
 """
 
-JUDGE_REASONABILITY_PROMPT = """The itinerary is as follows:\n{plan}\nBudget Summary:\n{budget_info}\nPlease analyze step-by-step based on the dimensions in the 'Review Criteria'.
-In the last line, if the itinerary meets all requirements, output 'Approved'; otherwise, output 'Rejected'."""
+JUDGE_REASONABILITY_PROMPT = """The itinerary is as follows:\n{plan}\nBudget Summary:\n{expense_info}\nPlease analyze and output step-by-step based on the dimensions in the 'Review Criteria'.
+In the last line, if the itinerary meets all requirements, output 'Approved'; otherwise, output 'Rejected'.Do not output anything else."""
 
-REASONABILITY_ADVICE_PROMPT = "Based on the analysis above, please provide comprehensive and concise suggestions for itinerary modification. Do not output an example of the modification. Do not output anything else."
+REASONABILITY_ADVICE_PROMPT = "Based on the analysis above, please provide concise suggestions for itinerary modification. Do not output an example of the modification. Do not output anything else."
 
 # ---Rating Accumulation Agent---
 RATING_SUMMARY_SYSTEM_PROMPT = """# Rating Accumulation Analyst
@@ -224,5 +235,44 @@ Total Restaurant Ratings: (0 + 4.6 + 4.8) + (4.2 + 4.5 + 4.7) + (3.6 + 4.8)
 Total Attractions Ratings: (4.9 + 4.6) + (4.9) + (4.7 + 4.5)
 Total Accommodation Ratings: (88) + (88) + (0)
 ```
+"""
+
+COUNT_POI_SYSTEM_PROMPT = """# POI Counter
+
+You are a POI counter, and your task is to count the number of different types of POIs in the itinerary provided by the user.
+
+## Workflow
+Let's reason step by step:
+1. Count the number of restaurants and attractions for each day separately.
+2. Finally, output "=====Summary=====", followed by the accumulated results for each day.
+3. the number of accommodations is directly the number of days provided in the itinerary minus one.
+
+## Rules
+- Only provide the calculation formulas, do not solve any of them. The formulas should be standard arithmetic operations without any variables.
+- Finally, make sure to output "=====Summary=====", followed by the merged accumulated results for each day.
+- The number of attractions and restaurants is accumulated through arithmetic expressions, while the number of accommodations is directly the number of days provided in the itinerary minus one. For example, if the itinerary provides 3 days, then the number of accommodations is 2.
+
+## Output Example
+Strictly follow this template for the POI count analysis:
+```
+### Daily POI Count
+Day 1:
+Restaurant:We visited restuarant A and restuarant B, so the count is 2.
+Attractions: We visited attraction C, so the count is 1.
+
+Day 2:
+Restaurant: We visited restuarant C and restuarant D, so the count is 2.
+Attractions: We visited attraction E, so the count is 1.
+
+Day 3:
+Restaurant: We visited restuarant G, so the count is 1.
+Attractions: We visited attraction H and attraction I, so the count is 2.
+
+=====Summary=====
+Total Restaurants: 2 + 2 + 1
+Total Attractions: 1 + 1 + 2
+Total Accommodations: 2
+```
+
 """
 

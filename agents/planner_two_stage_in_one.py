@@ -49,6 +49,12 @@ planner_two_stage_in_one.tools.add_tool(
         {
             'name': 'city',
             'description': 'City name',
+        },
+        {
+            'name': 'query',
+            'required': False,
+            'description': 'Search keywords or phrases.Example: amusement parks',
+            'default': 'must-visit attractions',
         }
     ]
 )
@@ -61,6 +67,12 @@ planner_two_stage_in_one.tools.add_tool(
         {
             'name': 'city',
             'description': 'City name',
+        },
+        {
+            'name': 'query',
+            'required': False,
+            'description': 'Search keywords or phrases.Example: chinese restuarants',
+            'default': 'must-visit restaurants',
         }
     ]
 )
@@ -97,11 +109,11 @@ planner_two_stage_in_one.tools.add_tool(
     parameters=[
         {
             'name': 'origin',
-            'description': 'Departure city.keep it concise',
+            'description': 'the *IATA code* of departure city',
         },
         {
             'name': 'destination',
-            'description': 'Destination city.keep it concise',
+            'description': 'the *IATA code* of destination city',
         },
         {
             'name': 'departure_date',

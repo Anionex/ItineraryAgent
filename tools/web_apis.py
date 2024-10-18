@@ -1,14 +1,23 @@
 import json
-import googlemaps
-from datetime import datetime
-import dotenv
-from openai import OpenAI
-
-
-dotenv.load_dotenv()
 import os
 import sys
+import time
 import concurrent.futures
+import googlemaps
+from datetime import datetime, timedelta
+import dotenv
+from openai import OpenAI
+from diskcache import Cache
+from functools import wraps, lru_cache
+current_dir = os.path.dirname(__file__)
+sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
+
+from config import *
+from tools.utils import translate_city, get_restaurant_average_cost, get_entity_attribute
+
+dotenv.load_dotenv()
+
+
 from functools import lru_cache
 current_dir = os.path.dirname(__file__)
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
@@ -16,8 +25,25 @@ sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 from config import *
 from tools.utils import translate_city, get_restaurant_average_cost, get_entity_attribute
 
-gmaps = googlemaps.Client(key=os.getenv("GOOGLE_MAPS_API_KEY"))
+# 设置缓存
+cache = Cache('./cache_directory')
 
+# 定义磁盘缓存装饰器
+def disk_cache(expire=timedelta(days=7)):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
+            result = cache.get(key)
+            if result is None:
+                result = func(*args, **kwargs)
+                # 修改这里
+                expire_time = None if expire is None else time.time() + expire.total_seconds()
+                cache.set(key, result, expire=expire_time)
+            return result
+        return wrapper
+    return decorator
+gmaps = googlemaps.Client(key=os.getenv("GOOGLE_MAPS_API_KEY"))
 
 from amadeus import Client, ResponseError, Location
 
@@ -26,9 +52,9 @@ amadeus = Client(
     client_secret=os.getenv("AMADEUS_API_SECRET"),
     hostname='production'
 )
-@lru_cache()
-def get_accommodations(city, check_in_date, check_out_date, adults, rooms=1, currency=GLOBAL_CURRENCY, language=GLOBAL_LANGUAGE, max_results=15):
 
+@disk_cache(expire=timedelta(days=30))
+def get_accommodations(city, check_in_date, check_out_date, adults, rooms=1, currency=GLOBAL_CURRENCY, language=GLOBAL_LANGUAGE, max_results=15):
     try:
         # Translate first
         # city = translate_city(city)
@@ -90,17 +116,17 @@ def get_accommodations(city, check_in_date, check_out_date, adults, rooms=1, cur
     except ResponseError as error:
         return f"An error occurred: {error}"
 
-@lru_cache()
-def get_attractions(city, language=GLOBAL_LANGUAGE, num=10):
+@disk_cache(expire=timedelta(days=30))
+def get_attractions(city, query: str = "must-visit attractions", language=GLOBAL_LANGUAGE, num=10):
     # Get the latitude and longitude of the city
     geocode_result = gmaps.geocode(city)
     lat = geocode_result[0]['geometry']['location']['lat']
     lng = geocode_result[0]['geometry']['location']['lng']
     # Execute search
-    results = gmaps.places(query=f"attractions in {city}", 
+    results = gmaps.places(query=f"{query} in {city}", 
                            location=(lat, lng),
                            language=language,
-                           type=f"must-visit attractions in {city}",
+                           type="tourist_attraction",
                            )
     
     # Extract results
@@ -118,7 +144,7 @@ def get_attractions(city, language=GLOBAL_LANGUAGE, num=10):
     # Concurrently get ticket prices for attractions
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(num, 10)) as executor:
         future_to_price = {
-            executor.submit(get_entity_attribute, attraction['Name'], 'ticket price', 'free', "return cost for a single person.if there is no such information, return 'free' rather than a uncertain range.Your output should be a single number+currency code, e.g. 25$"): attraction
+            executor.submit(get_entity_attribute, attraction['Name'], 'ticket price', 'free', "return cost for a single person.if there is no such information, return 'free' rather than a uncertain range.Your output should be a single number+currency code, e.g. $25"): attraction
             for attraction in attractions[:num]
         }
         
@@ -138,14 +164,14 @@ def get_attractions(city, language=GLOBAL_LANGUAGE, num=10):
         return f"There are no attractions found in {city}."
     return str_answer
 
-@lru_cache()
-def get_restaurants(city, language=GLOBAL_LANGUAGE, num=10):
+@disk_cache(expire=timedelta(days=7))
+def get_restaurants(city, query: str = "must-visit restaurants", language=GLOBAL_LANGUAGE, num=10):
     # Get the latitude and longitude of the city
     geocode_result = gmaps.geocode(city)
     lat = geocode_result[0]['geometry']['location']['lat']
     lng = geocode_result[0]['geometry']['location']['lng']
     # Execute search
-    results = gmaps.places(query=f"must-visit restaurants in {city}", 
+    results = gmaps.places(query=f"{query} in {city}", 
                            location=(lat, lng),
                            language=language,
                            type="restaurant",
@@ -192,7 +218,7 @@ def get_restaurants(city, language=GLOBAL_LANGUAGE, num=10):
                     average_cost, extra_info = future.result()
                 except Exception as exc:
                     print(f'Error generating average price for {restaurant["Name"]}: {exc}')
-                    average_cost = "25$"
+                    average_cost = "$25"
                 
                 # Store restaurant information for later use
                 restaurant['average_cost'] = average_cost
@@ -212,7 +238,7 @@ def get_restaurants(city, language=GLOBAL_LANGUAGE, num=10):
         # 5. Build final result string
         for index, restaurant in enumerate(restaurants[:num]):
             str_answer += (f"{index + 1}. {restaurant['Name']}, "
-                        f"rating: {restaurant['Rating']}, Average Cost/person: {restaurant.get('average_cost', '25$')}. "
+                        f"rating: {restaurant['Rating']}, Average Cost/person: {restaurant.get('average_cost', '$25')}. "
                         f"{restaurant.get('description', '')}\n"
                         )
 
@@ -220,7 +246,7 @@ def get_restaurants(city, language=GLOBAL_LANGUAGE, num=10):
         return f"There are no restaurants found in {city}."
     return str_answer # todo use amadeus api to get real POI information
 
-@lru_cache()
+@disk_cache(expire=timedelta(hours=24))
 def get_distance_matrix(origin, destination, mode, language=GLOBAL_LANGUAGE):
     # Origin lat, lng
     geocode_result = gmaps.geocode(origin)
@@ -240,25 +266,23 @@ def get_distance_matrix(origin, destination, mode, language=GLOBAL_LANGUAGE):
     return f"{mode.capitalize()}, from {origin} to {destination}, duration: {duration}, distance: {distance}"
 
 AMADEUS_MAX_LENGTH = 28
-@lru_cache()
+@disk_cache(expire=timedelta(hours=12))
 def get_flights(origin, destination, date):
     try:
-        # Translate first
-        # origin = translate_city(origin)
-        # destination = translate_city(destination)
-        # Get IATA codes
         print("origin, destination:", origin, destination)
-        origin_code = amadeus.reference_data.locations.get(
-            keyword=origin[:AMADEUS_MAX_LENGTH],
-            subType=Location.ANY
-        ).data[0]['iataCode']
+        # origin_code = amadeus.reference_data.locations.get(
+        #     keyword=origin[:AMADEUS_MAX_LENGTH],
+        #     subType=Location.ANY
+        # ).data[0]['iataCode']
 
-        destination_code = amadeus.reference_data.locations.get(
-            keyword=destination[:AMADEUS_MAX_LENGTH],
-            subType=Location.ANY
-        ).data[0]['iataCode']
-        print("origin_code, destination_code:", origin_code, destination_code)
-        print("date:", date)
+        # destination_code = amadeus.reference_data.locations.get(
+        #     keyword=destination[:AMADEUS_MAX_LENGTH],
+        #     subType=Location.ANY
+        # ).data[0]['iataCode']
+        # print("origin_code, destination_code:", origin_code, destination_code)
+        # print("date:", date)
+        origin_code = origin
+        destination_code = destination
         # Get flight information
         response = amadeus.shopping.flight_offers_search.get(
             originLocationCode=origin_code,
@@ -295,13 +319,15 @@ def get_flights(origin, destination, date):
 
     except ResponseError as error:
         print(error)
+        return f"Something wrong. Please check the input(especially the departure date)."
 
 if __name__ == "__main__":
     import time
     
     start_time = time.time()
-    result = get_attractions("Hongkong", num=10)
-    # result = get_flights("St. Petersburg", "Chicago O'Hare International Airport", "2024-10-17")
+    # result = get_attractions("Hongkong", num=10)
+    # {"origin":"ZGN","destination":"LAX","departure_date":"2024-10-19"}
+    result = get_flights("ZGN", "LAX", "2024-10-19")
     end_time = time.time()
     
     print(result)

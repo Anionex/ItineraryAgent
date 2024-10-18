@@ -31,7 +31,7 @@ from config import *
 def calculator(expression: str):
     return eval(expression)
 
-def google_search(search_query: str, gl: str):
+def google_search(search_query: str, gl: str, ):
     query = search_query
     payload = json.dumps({
         "q": query,
@@ -46,11 +46,11 @@ def google_search(search_query: str, gl: str):
     # print(filtered_search_results)
     return str([entry["content"] for entry in filtered_search_results])
 
-def get_attractions(city: str):
-    return web_apis.get_attractions(city=city)
+def get_attractions(city: str, query: str = "must-visit attractions"):
+    return web_apis.get_attractions(city=city, query=query)
 
-def get_restaurants(city: str):
-    return web_apis.get_restaurants(city=city)
+def get_restaurants(city: str, query: str = "must-visit restaurants"):
+    return web_apis.get_restaurants(city=city, query=query)
 
 # def get_accommodations(city: str):
 #     return web_apis.get_accommodations(city=city)

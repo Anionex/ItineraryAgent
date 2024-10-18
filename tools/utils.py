@@ -43,7 +43,7 @@ import json
 
 def parse_itinerary(itinerary):
     parser = OpenAIChat(model='gpt-4o', temperature=0)
-    response, _ = parser.chat(prompt=itinerary, history=[], meta_instruction="Keep the METADATA and itinerary sections as they are, remove other extraneous information, such as budget summaries. Do not output anything else!")
+    response, _ = parser.chat(prompt=itinerary, history=[], meta_instruction="Keep the Basic Information and itinerary sections as they are, remove other extraneous information, such as budget summaries. Do not output anything else!")
     return response
 
 import concurrent.futures
@@ -100,14 +100,14 @@ def get_restaurant_average_cost(restaurant_name):
     extra_info += "\nfiltered search results: " + str(filtered_search_results)
     get_restaurant_average_cost_system_prompt = """You focus on extracting average cost information for a restaurant from web search results and returning the average cost data.
 The final answer should be returned in JSON format, with the following schema:{"inference": "The inference process for determining the average cost in 20 words", "average_cost": "A number + currency unit expressing the average cost */person*.set it to $25 if no relevant information is found"}
-If the currency type is not provided, please infer it from the search results context. Do not output anything other than the JSON format answer!return cost for a single person.if there is no such information, return '25$' rather than a uncertain range!
+If the currency type is not provided, please infer it from the search results context. Do not output anything other than the JSON format answer!return cost for a single person.if there is no such information, return '$25' rather than a uncertain range!
     """
     completion = llm.chat('average cost search results:\n' + str(filtered_search_results), [], get_restaurant_average_cost_system_prompt)[0]
     # print("completion:", completion)
     extra_info += "\ncompletion 2: " + completion + '\n'
     # 找 average_cost
     if not 'average_cost":' in completion:
-        return "25$", extra_info
+        return "$25", extra_info
     return completion.split('average_cost":')[1].split('}')[0].strip().strip('"'), extra_info
 
 @lru_cache()
@@ -147,7 +147,7 @@ If no relevant information is found, set it to "{default_value}". Do not output 
 # Usage examples
 if __name__ == "__main__":
     # print(get_restaurant_average_cost("丰源轩"))
-    # print(get_entity_attribute("Fengyuanxuan", "average cost", "25$")[0])
+    # print(get_entity_attribute("Fengyuanxuan", "average cost", "$25")[0])
     # print(str(get_entity_attribute("Great Wall", "location description", "No relevant information found")[1]))
     response, extra_info = get_entity_attribute("飞牌", "起源", "no information")
     print(response)

@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import sys
 import os
 from config import *
@@ -12,11 +13,19 @@ iter_cnt = 0
 
 @retry(stop=stop_after_attempt(5), wait=wait_fixed(3), retry=retry_if_exception_type(Exception))
 def get_plan(planner, query, extra_requirements):
-    return planner.run(query, extra_requirements=extra_requirements, system_prompt=REACT_PLANNER_PROMPT_TWO_STAGE_IN_ONE)
+    try:
+        return planner.run(query, extra_requirements=extra_requirements, system_prompt=REACT_PLANNER_PROMPT_TWO_STAGE_IN_ONE).strip('<Itinerary:\n').strip('>')
+    except Exception as e:
+        print(f"error occurred in get_plan: {e}")
+        raise
 
 @retry(stop=stop_after_attempt(5), wait=wait_fixed(3), retry=retry_if_exception_type(Exception))
 def check_plan(plan, query, extra_requirements):
-    return checker.check_plan(plan, query, extra_requirements)
+    try:
+        return checker.check_plan(plan, query, extra_requirements)
+    except Exception as e:
+        print(f"error occurred in check_plan: {e}")
+        raise
 
 
 def planner_checker_loop(query, extra_requirements=''):
@@ -42,22 +51,22 @@ def planner_checker_loop(query, extra_requirements=''):
         if iter_cnt >= MAX_CHECK_ITER:
             print("=====\nReach max check iter.\n=====")
             return {"itinerary":plan, 
-                    "budget_info": checker.budget_info, 
-                    "rating_info": checker.rating_info
+                    "expense_info": checker.expense_info, 
+                    "average_rating": checker.average_rating
                     }
         # 如果没有建议，结束循环
         if "No more suggestion" in check_result or "Something went wrong!!!" in check_result:
             print("=====\nNo more suggestion.\n=====")
             return {"itinerary":plan, 
-                    "budget_info": checker.budget_info, 
-                    "rating_info": checker.rating_info
+                    "expense_info": checker.expense_info, 
+                    "average_rating": checker.average_rating
                     }
         
         # 如果有建议，将其添加到 planner 的 scratchpad 中
         else:
             print("Advice found.")
             advice = check_result.strip()
-            response = f"\nAdvice: Based on the feedback, we need to adjust our plan. Advice is as follows: \n{advice}"
+            response = f"\nSystem's feedback: \n{advice}"
             print(response)
             planner.scratchpad += response
             
@@ -69,6 +78,11 @@ def read_file(file_path):
         return file.read()
 
 if __name__ == '__main__':
+    
+    import time
+
+    start_time = time.time()
+
     planner = planner_two_stage_in_one
     checker = PlanChecker()
     
@@ -86,3 +100,10 @@ if __name__ == '__main__':
         file.write(planner.scratchpad)
         file.write("\n")
         file.write(str(plan_info))
+
+    ## 打印plan_info到json文件
+    with open("logs/plan_info" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + ".json", "w", encoding="utf-8") as file:
+        json.dump(plan_info, file, ensure_ascii=False)
+
+    end_time = time.time()
+    print(f"Runtime: {end_time - start_time:.2f} seconds")
