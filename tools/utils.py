@@ -12,7 +12,7 @@ from agents.chat_model import OpenAIChat
 from langchain_openai import ChatOpenAI
 from functools import lru_cache
 search = GoogleSerperAPIWrapper()
-llm = OpenAIChat(model="gemini-1.5-flash-002")
+llm = OpenAIChat(model="gpt-4o")
 # llm = OpenAIChat(model="gpt-4o")
 # llm.client = OpenAI(
 #     api_key=os.getenv("GROQ_OPENAI_API_KEY"),

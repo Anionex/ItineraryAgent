@@ -36,7 +36,7 @@ class ReactAgent:
         self.hit_final_answer = False
 
 
-    def build_system_input(self, query, extra_requirements, system_prompt, itinerary_format_example=""):
+    def build_system_input(self, query, extra_requirements, system_prompt):
         tool_descs, tool_names = [], []
         for tool in self.tools.toolConfig:
             tool_descs.append(TOOL_DESC.format(**tool))
@@ -47,8 +47,7 @@ class ReactAgent:
                                          tool_names=tool_names, 
                                          current_date=datetime.now().strftime("%Y-%m-%d"), 
                                          query=query,
-                                         extra_requirements=extra_requirements,
-                                         itinerary_format_example=itinerary_format_example)
+                                         extra_requirements=extra_requirements)
         if GLOBAL_LANGUAGE != "en":
             sys_prompt += f"\n请你使用{GLOBAL_LANGUAGE}作为输出语言"
         return sys_prompt

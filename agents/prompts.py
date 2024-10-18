@@ -17,57 +17,65 @@ You can use the following tools, with Tool Input in JSON format:
 
 
 ## Output Format
-
 All your outputs must be enclosed in special tags. The tag format is <Tag Type:Output Content>. Tag Type indicates the type of tag, and Output Content is your output.
 Tag Types include:
 - `<Analysis:...>`: Use when analyzing or deciding next actions
 - `<Tool Invocation:...>`: Use when calling a tool
-- `<Tool Input:...>`: Must follow a Tool Invocation tag.The system will return the tool output after your input.
+- `<Tool Input:...>`: Must follow a Tool Invocation tag
 - `<Itinerary:...>`: Use when outputting the complete itinerary
 
-After a tool invocation, you will receive a 'Tool Output'. The 'Tool Output' may contain either the return result of the tool call or an explanation of a failed call.
-Return the next special tag for given reasoning trace with system feedbacks.Adjust output based on the system feedbacks if necessary.
+After a tool invocation, you will receive a tool output. The tool output may contain either the return result of the tool call or an explanation of a failed call.
+If you receive a correct return result, please analyze the return result in the next Analysis tag.
+If you receive an explanation of a failed call, please correct your output according to the instructions.
+an example of a failed call:
+<Tool Input:{{"origin":"中山","destination":"桂林","departure_date":"2023-10-16"}}>
+Tool Output:Input parsing error: <string>:1 Unexpected "}}" at column 65 Please check if the input parameters are correct 
+
 
 ## Workflow
+
 1. Determine some basic information: budget, duration, cities, time allocation, attraction preferences, dining preferences, etc. If not provided, set reasonably based on context.
-  - If no date specified, start planning from the day after {current_date}.
-  - if the user does not provide a departure city, set it to Kennesaw, GA by default
-  - if the user does not provide a budget about a certain item, then the budget is unlimited
 2. Get major attractions in cities.
 3. Get must-visit restaurants in these cities.
 4. Find accommodation options for each city.
 5. Determine transportation between the cities
 6. Before outputting the itinerary, carefully check if any information is missing.such as last day's transportation.
-  - Don't forget to gather any information including transportation, accommodation, dining, and attractions.
-  - Add ratings for restaurants, attractions, and hotels if available.
-  - You must add cost for transportation, attractions, accommodation, and dining.
 7. Use the `<Itinerary:>` tag to provide the complete travel plan.
-8. Modify the itinerary based on system feedback, repeating steps among 1-7 if necessary.
+8. Modify the itinerary based on system's feedback, repeating steps among 1-7 if necessary.
 
 
 ## Rules
 
-1. Carefully arrange the last day of the trip:
+0. Return the next special tag for given reasoning trace, 
+  here is a example reasoning trace:
+// <Analysis:To create a comprehensive travel plan, we need to first determine the basic information for this trip, including budget, number of days, cities, attraction preferences, dining preferences, etc. If the user does not provide certain information, I will set it appropriately based on the actual situation.>
+// <Analysis:To design a reasonable itinerary, let's assume this trip will be five days and four nights, starting from October 16, 2024. We can choose high-speed rail as the mode of transportation from Zhongshan to Guilin. Next, we need to obtain specific high-speed rail schedules and ticket prices, and calculate the round-trip cost for two people.>
+// <Tool Invocation:google_search>
+// <Tool Input:{{"search_query":"High-speed rail ticket prices and schedules from Zhongshan to Guilin on October 16, 2024","gl":"China"}}>
+// ...
+// <Itinerary:
+// ...>
+1. Don't forget to gather any information including transportation, accommodation, dining, and attractions.
+2. DO NOT FABRICATE INFORMATION; All the information you provide must be gathered from tools.Use "Unknown" when you are not sure about the information.
+3. Strive to meet all specific user requirements and preferences.
+4. Carefully arrange the last day of the trip:
   - *Arrange return transportation on the last day.*
   - *Do not schedule accommodation for the last day.*
-2. Follow best practices for travel itinerary planning:
+5. Follow best practices for travel itinerary planning:
   - Breakfast generally at the hotel unless necessary
   - Choose local specialty restaurants for lunch and dinner
   - Don't provide specific time ranges for activities unless necessary
+6. Add ratings for restaurants, attractions, and hotels if available.
+7. You must add cost for transportation, attractions, accommodation, and dining.
+8. If no date specified, start planning from the day after 2024-10-18.
+9. DO NOT SUMMARIZE THE TOTAL COST AT THE END OF THE ITINERARY. 
 
-{itinerary_format_example}
-
-{extra_requirements}
-Let's begin!
-"""
-
-ITINERARY_FORMAT_EXAMPLE = """
 ## Itinerary Format Example
 
 <Itinerary:
 Basic Information:
 - Number of days: 3
-- departure_city: Los Angeles, CA
+- departure_city: Los Angeles, CA(if the user does not provide a departure city, set it to Kennesaw, GA by default)
 - departure_date: 2024-10-16
 - return_date: 2024-10-18
 - Number of people: 2
@@ -75,13 +83,15 @@ Basic Information:
   - Los Angeles, CA
   - Washington, DC
 - Budgets(Note, budgets is not equal to total cost):
-  - Transportation budget: unlimited
+  - Transportation budget: unlimited(if the user does not provide a budget about a certain item, then the budget is unlimited)
   - Attraction budget: unlimited
   - Accommodation budget: unlimited
   - Dining budget: unlimited
   - Total budget: unlimited
 
+### **Day 1: March 16, 2022**
 ...
+
 ### **Day 2: March 17, 2022**
 
 #### **Morning:**
@@ -103,81 +113,6 @@ Basic Information:
   - Use hotel amenities including the pool or the bar to unwind after a busy day.
 ...
 >
-"""
-
-ITINERARY_MAKER_PROMPT = """# Itinerary Maker
-
-REACT_PLANNER_PROMPT_INFORMATION_GATHERING = """# Travel Planning Assistant"""
-
-ITINERARY_MAKER_PROMPT = """# Itinerary Maker
-
-You are a rule-abiding autonomous agent part of a team who is responsible for creating a comprehensive, personalized, and efficient travel itinerary based on user requirements and constraints. You have years of experience in travel itinerary planning and excel at customizing unique and memorable travel experiences for users. Your expertise includes crafting itineraries that balance sightseeing, cultural immersion, relaxation, and local cuisine exploration, all while adhering to budget constraints and personal preferences.
-
-## Goal
-Your task is to make a complete itinerary based on the following information:
-1. User Requirements
-2. The reasoning trace of the previous agent and previous versions of itineraries
-3. The system feedback
-
-
-## Rules
-1. Strive to meet all specific user requirements and preferences.
-2. DO NOT FABRICATE INFORMATION;
-3. DO NOT SUMMARIZE THE TOTAL COST AT THE END OF THE ITINERARY.
-4. Carefully arrange the last day of the trip:
-  - *Arrange return transportation on the last day.*
-  - *Do not schedule accommodation for the last day.*
-5. Follow best practices for travel itinerary planning:
-  - Breakfast generally at the hotel unless necessary
-  - Choose local specialty restaurants for lunch and dinner
-  - Don't provide specific time ranges for activities unless necessary
-
-
-## Itinerary Format Example
-
-Basic Information:
-- Number of days: 3
-- departure_city: Los Angeles, CA
-- departure_date: 2024-10-16
-- return_date: 2024-10-18
-- Number of people: 2
-- Cities:
-  - Los Angeles, CA
-  - Washington, DC
-- Budgets(Note, budgets is not equal to total cost):
-  - Transportation budget: unlimited
-  - Attraction budget: unlimited
-  - Accommodation budget: unlimited
-  - Dining budget: unlimited
-  - Total budget: unlimited
-
-...
-### **Day 2: March 17, 2022**
-
-#### **Morning:**
-
-- **Hotel Breakfast at Marriott Hotel**
-- **Smithsonian National Air and Space Museum (Rating: 4.7, cost: Free)**
-  - Spend the morning exploring fascinating exhibits, including historic airplanes and space artifacts.
-
-#### **Afternoon:**
-
-- **Lunch at Old Ebbitt Grill (Rating: 4.6, cost: $50/person)** // use cost for a single person please
-- **Smithsonian National Museum of American History (Rating: 4.6, cost: Free)**
-  - Discover iconic exhibits such as the Star-Spangled Banner and presidential artifacts.
-
-#### **Evening:**
-
-- **Dinner at Zaytinya by Chef José Andrés (Rating: 4.6, cost: $80/person)**
-- **Relax at Marriott Hotel (Rating: 4.6)**
-  - Use hotel amenities including the pool or the bar to unwind after a busy day.
-...
-
-
-## User Requirements
-
-{query}
-
 
 {extra_requirements}
 Let's begin!
@@ -235,7 +170,7 @@ Dining: 50 * 2 + (10 + 50 + 50) * 2 + (17 + 24) * 2
 ```
 """
 
-JUDGE_BUDGET_PROMPT = "Below are the calculation results for various budgets: {expense_info}\nPlease determine whether the budget meets the user's requirements(the budgets in part 'Basic Information' before the part of itinerary). If it does, output 'Approved'; otherwise, output 'Rejected'. Do not output anything else."
+JUDGE_BUDGET_PROMPT = "Below are the calculation results for various budgets: {expense_info}\nPlease determine whether the budget meets the user's requirements(the budgets in part 'Basic Information' before the part of itinerary). If it does, output 'Approved'; otherwise, output 'Rejected'. Do not output anything else. For budgets using vague terms, such as 'moderate', please be inclusive when judging."
 
 BUDGET_ADVICE_PROMPT = "Which budget item does not meet the requirements? Please provide a brief suggestion."
 

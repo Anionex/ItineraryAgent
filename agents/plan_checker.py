@@ -104,7 +104,7 @@ def count_poi(response):
 
 class PlanChecker:
     def __init__(self, **kwargs) -> None: 
-        kwargs['model'] = kwargs.get('model', 'gemini-1.5-flash-002')
+        kwargs['model'] = kwargs.get('model', 'gpt-4o')
         kwargs['temperature'] = kwargs.get('temperature', 0)
         kwargs['is_verbose'] = False
         self.kwargs = kwargs
@@ -169,7 +169,7 @@ class PlanChecker:
 
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
     def _rating_summary(self, plan):
-        self.model.kwargs['model'] = 'gemini-1.5-flash-002'
+        self.model.kwargs['model'] = 'gpt-4o'
         response, _ = self.model.chat(prompt=f"Here is the itinerary:\n{plan}",
                                             history=[],
                                             meta_instruction=RATING_SUMMARY_SYSTEM_PROMPT)
