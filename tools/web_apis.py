@@ -139,8 +139,8 @@ def get_attractions(city, query: str = "must-visit attractions", language=GLOBAL
         }
         # Add to the list if rating is not 0
         if attraction["Rating"] > 0:
-            attractions.append(attraction)        
-    
+            attractions.append(attraction)      
+              
     # Concurrently get ticket prices for attractions
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(num, 10)) as executor:
         future_to_price = {
@@ -155,6 +155,7 @@ def get_attractions(city, query: str = "must-visit attractions", language=GLOBAL
                 attraction['Ticket Price'] = price
             except Exception as exc:
                 print(f'Error getting ticket price for {attraction["Name"]}: {exc}')
+                raise
     
     str_answer = ""
     for index, attraction in enumerate(attractions):
@@ -327,7 +328,8 @@ if __name__ == "__main__":
     start_time = time.time()
     # result = get_attractions("Hongkong", num=10)
     # {"origin":"ZGN","destination":"LAX","departure_date":"2024-10-19"}
-    result = get_flights("ZGN", "LAX", "2024-10-19")
+    # result = get_flights("ZGN", "LAX", "2024-10-19")
+    result = get_attractions("San Francisco")
     end_time = time.time()
     
     print(result)

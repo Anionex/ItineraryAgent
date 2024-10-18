@@ -106,7 +106,7 @@ class PlanChecker:
     def __init__(self, **kwargs) -> None: 
         kwargs['model'] = kwargs.get('model', 'gemini-1.5-flash-002')
         kwargs['temperature'] = kwargs.get('temperature', 0)
-        kwargs['is_verbose'] = True
+        kwargs['is_verbose'] = False
         self.kwargs = kwargs
         self.model = OpenAIChat(**kwargs)
         
@@ -151,6 +151,11 @@ class PlanChecker:
         sys_prompt = self.build_system_input(query, extra_requirements, check_stage='reasonability')
         
         self.model.kwargs['model'] = 'gpt-4o'
+        response, history = self.model.chat(
+            prompt=ANALYZE_REASONABILITY_PROMPT.format(plan=plan, expense_info=self.expense_info), 
+            history=history, 
+            meta_instruction=sys_prompt)
+        
         response, history = self.model.chat(
             prompt=JUDGE_REASONABILITY_PROMPT.format(plan=plan, expense_info=self.expense_info), 
             history=history, 

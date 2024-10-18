@@ -86,7 +86,7 @@ if __name__ == '__main__':
     planner = planner_two_stage_in_one
     checker = PlanChecker()
     
-    query = read_file("example_query.txt")
+    query = read_file("example_query2.txt")
     plan_info = planner_checker_loop(query)
     print("=====\nFinal Itinerary:\n=====")
     print(str(plan_info))

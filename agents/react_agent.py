@@ -36,7 +36,7 @@ class ReactAgent:
         self.hit_final_answer = False
 
 
-    def build_system_input(self, query, extra_requirements, system_prompt):
+    def build_system_input(self, query, extra_requirements, system_prompt, itinerary_format_example=""):
         tool_descs, tool_names = [], []
         for tool in self.tools.toolConfig:
             tool_descs.append(TOOL_DESC.format(**tool))
@@ -47,7 +47,8 @@ class ReactAgent:
                                          tool_names=tool_names, 
                                          current_date=datetime.now().strftime("%Y-%m-%d"), 
                                          query=query,
-                                         extra_requirements=extra_requirements)
+                                         extra_requirements=extra_requirements,
+                                         itinerary_format_example=itinerary_format_example)
         if GLOBAL_LANGUAGE != "en":
             sys_prompt += f"\n请你使用{GLOBAL_LANGUAGE}作为输出语言"
         return sys_prompt
@@ -67,7 +68,7 @@ class ReactAgent:
             return f'\n{ACTION_OUTPUT_HEADER}' + f"Input parsing error: {str(e)} Please check if the input parameters are correct"
         # print(f"success! then we will call the tool {plugin_name} with args {plugin_args}")
         try:
-            return f'\n{ACTION_OUTPUT_HEADER}' + str(self.tools.execute_tool(plugin_name, **plugin_args))
+            return f'\n{ACTION_OUTPUT_HEADER}\n' + str(self.tools.execute_tool(plugin_name, **plugin_args))
         except Exception as e:
             return f'\n{ACTION_OUTPUT_HEADER}' + f"Tool execution error: {str(e)} Please check if the input parameters are correct"
 

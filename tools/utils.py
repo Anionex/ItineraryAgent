@@ -1,5 +1,6 @@
 import os
 import sys
+from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 current_dir = os.path.dirname(__file__)
 external_dir = os.path.abspath(os.path.join(current_dir, '..'))  
 sys.path.append(external_dir)
@@ -41,6 +42,7 @@ def translate_city(city_name): # temporary method
 import requests
 import json
 
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(3))
 def parse_itinerary(itinerary):
     parser = OpenAIChat(model='gpt-4o', temperature=0)
     response, _ = parser.chat(prompt=itinerary, history=[], meta_instruction="Keep the Basic Information and itinerary sections as they are, remove other extraneous information, such as budget summaries. Do not output anything else!")
@@ -48,6 +50,7 @@ def parse_itinerary(itinerary):
 
 import concurrent.futures
 @lru_cache()
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(3))
 def relavant_with_query(title,content, query):
     relavant_with_query_system_prompt = "You focus on determining whether information about the query is relavant to a given website. If possible, return 'yes', otherwise return 'no'. Do not output anything else!"
     # relavant_with_query_system_prompt = "You focus on determining whether a search result contains direct or indirect information about the query. If it does, return 'yes', otherwise return 'no'. Do not output anything else!"
@@ -56,6 +59,7 @@ def relavant_with_query(title,content, query):
     return "yes" in completion.lower(), "query:"+query+"\ntitle:"+title+"\ncontent:"+content+"\ncompletion:"+completion+'\n'
 
 @lru_cache()
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(3))
 def filter_search_results(search_results, query):
     extra_info = ""
     # only remain title and content 
@@ -84,6 +88,7 @@ def filter_search_results(search_results, query):
     return short_search_results, extra_info
 
 @lru_cache()
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(3))
 def get_restaurant_average_cost(restaurant_name):
     extra_info = ""
     query = f"{restaurant_name} average cost 人均 价格"
@@ -111,6 +116,7 @@ If the currency type is not provided, please infer it from the search results co
     return completion.split('average_cost":')[1].split('}')[0].strip().strip('"'), extra_info
 
 @lru_cache()
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(3))
 def get_entity_attribute(entity_name, attribute, default_value, extra_requirements="")->tuple[str, str]:
     """
     return the attribute value and extra information
