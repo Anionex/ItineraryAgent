@@ -1,7 +1,0 @@
-运行指南：
-在agents文件夹中激活travelplanner环境并运行。
-
-8.6晚
-todo
-1. 搭建一个流式的网页
-2. 尝试用agently workflow复现一下。

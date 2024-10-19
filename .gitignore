@@ -6,6 +6,13 @@ trip2.html
 Untitled-1.*
 tmp*
 tmp*/
+logs/
+cache_directory/
+from agents.py
+misc/
+test_*.py
+*documentation*
+evaluation/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

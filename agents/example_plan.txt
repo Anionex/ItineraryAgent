@@ -1,0 +1,108 @@
+Basic Information:
+- Number of days: 5
+- Departure date: 2024-10-19
+- Return date: 2024-10-25
+- Number of people: 2
+- Cities:
+  - Los Angeles, CA
+  - San Francisco, CA
+- Budgets:
+  - Transportation budget: unlimited
+  - Attraction budget: unlimited
+  - Accommodation budget: unlimited
+  - Dining budget: unlimited
+  - Total budget: unlimited
+
+### **Day 1: October 19, 2024**
+#### **Morning:**
+- Prepare for departure from Guilin, China.
+
+#### **Afternoon:**
+- Lunch in Guilin.
+
+#### **Evening:**
+- **Flight from Guilin to Los Angeles**
+  - Flight: 3U3837, 21:55-20:25 (next day), price:  $444.41/person
+
+### **Day 2: October 20, 2024**
+
+#### **Morning:**
+- Arrive in Los Angeles at 20:25, check in to **Aloft El Segundo Los Angeles Airport** (Rating: 4.2, price: 681.02 USD for 2 adults)
+- **Yang Chow Restaurant** (Rating: 4.5, Cost: $24/person)
+
+#### **Afternoon:**
+- Rest and settle into the hotel.
+- **Visit Griffith Observatory** (Rating: 4.7, cost: $0/person)
+
+#### **Evening:**
+- **Dinner at Golden Tree Restaurant** (Rating: 4.5, Cost: $25/person)
+- Relax at the hotel.
+
+### **Day 3: October 21, 2024**
+
+#### **Morning:**
+- Breakfast at hotel.
+- **Visit The Getty** (Rating: 4.8, cost: $0/person)
+
+#### **Afternoon:**
+- **Lunch at Foo-Chow Restaurant** (Rating: 4.5, Cost: $15/person)
+- Explore **Hollywood Sign** (Rating: 4.6, cost: free)
+- Walk along **Hollywood Walk of Fame** (Rating: 4.1, cost: free)
+
+#### **Evening:**
+- **Dinner at Peking Tavern** (Rating: 4.4, Cost: $20/person)
+- Return to hotel and unwind.
+
+### **Day 4: October 22, 2024**
+
+#### **Morning:**
+- Breakfast and check-out from hotel.
+- **Visit California Science Center** (Rating: 4.7, cost: $0/person)
+
+#### **Afternoon:**
+- **Lunch at Jin's Chinese Kitchen** (Rating: 4.6, Cost: $12.80/person)
+- Travel to the airport for flight to San Francisco.
+
+#### **Evening:**
+- **Check in to Hotel Abri, San Francisco** (Rating: 4.0, price: 643.34 USD for 2 adults)
+- **Dinner at Dumpling Home** (Rating: 4.6, Cost: $25/person)
+- Rest and settle into the hotel.
+
+### **Day 5: October 23, 2024**
+
+#### **Morning:**
+- Breakfast at hotel.
+- **Visit Golden Gate Park** (Rating: 4.8, cost: $0/person)
+
+#### **Afternoon:**
+- **Lunch at The Garden Restaurant** (Rating: 4.2, Cost: $25/person)
+- Visit **PIER 39** (Rating: 4.6, cost: free)
+
+#### **Evening:**
+- **Dinner at HK Lounge Bistro** (Rating: 4.7, Cost: $40.5/person)
+- Relax at hotel.
+
+### **Day 6: October 24, 2024**
+
+#### **Morning:**
+- Breakfast at hotel.
+- Visit **Alcatraz Island** (Rating: 4.7, cost: free)
+
+#### **Afternoon:**
+- **Lunch at R & G Lounge** (Rating: 4.3, Cost: $15/person)
+- Walk along **Fisherman's Wharf** (Rating: 4.6, cost: free)
+
+#### **Evening:**
+- **Dinner at Dragon Beaux** (Rating: 4.4, Cost: $6.24/person)
+- Prepare for departure on the next day.
+
+### **Day 7: October 25, 2024**
+#### **Morning:**
+- Breakfast and check-out from hotel.
+- **Flight from San Francisco to Guilin**
+  - Flight: MU586, 12:30-17:10, price:  $918.10/person
+
+#### **Afternoon:**
+- Arrive in Guilin, travel back home.
+
+### **End of Trip**
