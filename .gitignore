@@ -9,10 +9,11 @@ tmp*/
 logs/
 cache_directory/
 from agents.py
-misc/
+/misc/
 test_*.py
 *documentation*
-evaluation/
+/evaluation/
+/utils/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
