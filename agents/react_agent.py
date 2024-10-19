@@ -73,8 +73,8 @@ class ReactAgent:
 
     
     def step(self, scratchpad):
-        return self.model.create_assistant_completion(scratchpad, meta_instruction=self.system_prompt)
-        # return self.model.chat(scratchpad, [], self.system_prompt)[0]
+        # return self.model.create_assistant_completion(scratchpad, meta_instruction=self.system_prompt)
+        return self.model.chat(scratchpad, [], self.system_prompt)[0]
 
       
     def run(self, query, extra_requirements="", system_prompt=REACT_PROMPT):
@@ -101,7 +101,7 @@ class ReactAgent:
                 response = "Please remember that you shouldn't generate Tool Output by yourself"
             else:
                 print("the ai gave an unexpected response:", response)
-                response = f"Please remember that only the following tags are allowed: {THOUGHT_HEADER + STOP_WORD}, {ACTION_HEADER + STOP_WORD}, {ACTION_INPUT_HEADER + STOP_WORD}, {ACTION_OUTPUT_HEADER + STOP_WORD}, {ANSWER_HEADER + STOP_WORD}"
+                response = f"Please remember that only the following tags are allowed: {THOUGHT_HEADER + STOP_WORD}, {ACTION_HEADER + STOP_WORD}, {ACTION_INPUT_HEADER + STOP_WORD}, {ANSWER_HEADER}"
             if not is_tool_input:
                 response += STOP_WORD
             print("[1]" + response)

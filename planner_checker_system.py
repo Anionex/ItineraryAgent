@@ -3,15 +3,14 @@ import json
 import sys
 import os
 from config import *
-from agents.chat_model import OpenAIChat
 from agents.planner_two_stage_in_one import planner_two_stage_in_one
 from agents.plan_checker import PlanChecker
 from agents.prompts import REACT_PLANNER_PROMPT_TWO_STAGE_IN_ONE
-from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 iter_cnt = 0
 
-@retry(stop=stop_after_attempt(5), wait=wait_fixed(3), retry=retry_if_exception_type(Exception))
+@retry(stop=stop_after_attempt(5), wait=wait_fixed(3))
 def get_plan(planner, query, extra_requirements):
     try:
         return planner.run(query, extra_requirements=extra_requirements, system_prompt=REACT_PLANNER_PROMPT_TWO_STAGE_IN_ONE).strip('<Itinerary:\n').strip('>')
@@ -19,7 +18,7 @@ def get_plan(planner, query, extra_requirements):
         print(f"error occurred in get_plan: {e}")
         raise
 
-@retry(stop=stop_after_attempt(5), wait=wait_fixed(3), retry=retry_if_exception_type(Exception))
+@retry(stop=stop_after_attempt(5), wait=wait_fixed(3))
 def check_plan(plan, query, extra_requirements):
     try:
         return checker.check_plan(plan, query, extra_requirements)

@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "tools")))
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 from agents.react_agent import ReactAgent
 from prompts import REACT_PLANNER_PROMPT_TWO_STAGE_IN_ONE
-from tool_funcs import get_attractions, get_restaurants, get_accommodations, get_flights, get_google_distance_matrix, calculator, google_search
+from tool_funcs import *
 from config import *
 planner_two_stage_in_one = ReactAgent(model="gpt-4o", stop=['>']) # import this
 
@@ -24,6 +24,19 @@ planner_two_stage_in_one = ReactAgent(model="gpt-4o", stop=['>']) # import this
 #         }
 #     ]
 # )  
+planner_two_stage_in_one.tools.add_tool(
+    name_for_human="Get Recommend City",
+    name_for_model="get_recommend_city",
+    func=get_recommend_city,
+    description="Used whenever you need to retrieve information about recommended cities for a specified province/country/area.Must be used when the user does not specify the city.",
+    parameters=[
+        {
+            'name': 'area',
+            'description': 'Area name',
+        }
+    ]
+)
+
 planner_two_stage_in_one.tools.add_tool(
     name_for_human="google search",
     name_for_model="google_search",
