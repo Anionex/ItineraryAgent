@@ -1,3 +1,4 @@
+import inspect
 import json
 import os
 import sys
@@ -33,11 +34,20 @@ def disk_cache(expire=timedelta(days=7)):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
+            # 获取函数的参数名
+            sig = inspect.signature(func)
+            bound_args = sig.bind(*args, **kwargs)
+            bound_args.apply_defaults()
+
+            # 创建一个包含所有参数名和值的字典
+            all_args = dict(bound_args.arguments)
+
+            # 使用函数名、参数名和值生成缓存键
+            key = f"{func.__name__}:{json.dumps(all_args, sort_keys=True)}"
+            
             result = cache.get(key)
             if result is None:
                 result = func(*args, **kwargs)
-                # 修改这里
                 expire_time = None if expire is None else time.time() + expire.total_seconds()
                 cache.set(key, result, expire=expire_time)
             return result
@@ -54,7 +64,7 @@ amadeus = Client(
 )
 
 @disk_cache(expire=timedelta(days=30))
-def get_accommodations(city, check_in_date, check_out_date, adults, rooms=1, currency=GLOBAL_CURRENCY, language=GLOBAL_LANGUAGE, max_results=15):
+def get_accommodations(city, check_in_date, check_out_date, adults,currency=GLOBAL_CURRENCY, rooms=1, language=GLOBAL_LANGUAGE, max_results=15):
     try:
         # Translate first
         # city = translate_city(city)
@@ -329,7 +339,8 @@ if __name__ == "__main__":
     # result = get_attractions("Hongkong", num=10)
     # {"origin":"ZGN","destination":"LAX","departure_date":"2024-10-19"}
     # result = get_flights("ZGN", "LAX", "2024-10-19")
-    result = get_attractions("San Francisco")
+    # result = get_attractions("San Francisco")
+    result = get_accommodations("San Francisco", "2024-10-19", "2024-10-20", 1)
     end_time = time.time()
     
     print(result)
